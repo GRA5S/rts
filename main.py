@@ -2,7 +2,7 @@ import pygame
 import math
 
 pygame.init()
-screen = pygame.display.set_mode((1280, 720))
+screen = pygame.display.set_mode((720, 720), pygame.RESIZABLE)
 pygame.display.set_caption("Point Line UI")
 clock = pygame.time.Clock()
 running = True
@@ -35,11 +35,24 @@ points = []
 held_point = None
 RADIUS = 6
 INTERACTION_RADIUS = 20
+FONT_SIZE = 14
+FIELD_IMAGE = pygame.image.load("override.bmp")
+
 while running:
+    screenwidth = screen.get_width()
+    screenheight = screen.get_height()
+    field_image = pygame.transform.scale(
+        FIELD_IMAGE, 
+        (
+            min(
+                screenwidth, 
+                screenheight - FONT_SIZE*2
+            ),
+        ) * 2 # this is not multiplying the number by two this is making it into a tuple with 2 of the same thingy
+    ) # idc if this takes a shitton of space its more readable
     mousepos = pygame.mouse.get_pos()
     screen.fill(BG)
-    
-    
+    screen.blit(field_image, (screen.get_width() / 2 - field_image.get_width() / 2, FONT_SIZE*2))    
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -91,7 +104,7 @@ while running:
 
 
     # draw keybinds
-    font = pygame.font.SysFont("monospace", 14)
+    font = pygame.font.SysFont("monospace", FONT_SIZE)
     hint = font.render("shift+click: add point   backspace: undo   c: clear   scroll: rotate theta", True, HINT)
     screen.blit(hint, (12, 8))
 
