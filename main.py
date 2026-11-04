@@ -1,3 +1,13 @@
+"""
+TODO:
+- make it so that the cubic bezier is a class that inherits from Line
+- also re-add ability to do quadratic bezier
+- fix carrot point thin
+- rename carrot to control point
+- make theta follow control point 
+""" 
+
+
 import pygame
 import math
 
@@ -8,7 +18,7 @@ clock = pygame.time.Clock()
 running = True
 
 class Point:
-    def __init__(self, x, y, theta):
+    def __init__(self, x, y, theta = None):
         self.x = x
         self.y = y
         self.theta = theta
@@ -23,7 +33,13 @@ class Point:
     x: float
     y: float
     theta: float
-
+class Line:
+    def __init__(self, first_point, last_point):
+        self.first_point = first_point    
+        self.last_point = last_point
+        self.carrot = Point(first_point.x + 50, first_point.y)
+        self.carrot2 = Point(last_point.x + 50, last_point.y)
+    
 BG = (30, 30, 34)
 LINE = (120, 180, 255)
 DOT = (255, 255, 255)
@@ -32,6 +48,7 @@ HEADING = (255, 200, 80)
 HINT = (160, 160, 160)
 
 points = []
+lines = []
 held_point = None
 RADIUS = 6
 INTERACTION_RADIUS = 20
@@ -65,10 +82,18 @@ while running:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if keys[pygame.K_LSHIFT]:
                 points.append(Point(event.pos[0], event.pos[1], 0.0))
+                print(len(points))
+                if len(points) > 1:
+                    lines.append(Line(points[len(points)-2], points[len(points)-1]))
             else:
-                for i, p in enumerate(points):
+                for p in points:
                     if math.dist(mousepos, p.pos()) <= INTERACTION_RADIUS:
-                        held_point = i
+                        held_point = p
+                for line in lines:
+                    if math.dist(mousepos, line.carrot.pos()) <= INTERACTION_RADIUS:
+                        held_point = line.carrot
+                    elif math.dist(mousepos, line.carrot2.pos()) <= INTERACTION_RADIUS:
+                        held_point = line.carrot2
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
             if held_point: 
                 held_point = None
@@ -78,27 +103,64 @@ while running:
                     p.theta = (p.theta + event.y * 5) % 360
     
     if held_point != None:
-        points[held_point].set_pos(mousepos)
+        held_point.set_pos(mousepos)
 
+    # lines = []
+    # for i, p in enumerate(points[:-1]):
+    #     pygame.draw.circle(screen, (255,0,0), p.pos(), 20)
+    #     lines.append(Line(p, points[i+1]))
     
     
-    
-    # draw lines b/w points
-    if len(points) > 1:
-            pygame.draw.lines(screen, LINE, False, [p.pos() for p in points], 3)
+    for line in lines:
+        p1 = line.first_point
+        p2 = line.last_point
+        c = line.carrot
+        c2 = line.carrot2
+        # dist = math.dist(p1.pos(), p2.pos())
+        # LEAD = 0.5
+        # line.carrot = Point(
+        #     p1.x - (dist * math.sin(math.radians(p1.theta)) * LEAD),
+        #     p1.y - (dist * math.cos(math.radians(p1.theta)) * LEAD),
+        #     None
+        # )
+        # c = line.carrot
+        # line.carrot2 = Point(
+        #     p2.x - (dist * math.sin(math.radians(p2.theta)) * LEAD),
+        #     p2.y - (dist * math.cos(math.radians(p2.theta)) * LEAD),
+        #     None
+        # )
+        # c2 = line.carrot2
+        pygame.draw.circle(screen, DOT, c.pos(), RADIUS)
+        pygame.draw.circle(screen, DOT, c2.pos(), RADIUS)
+        linepoints = []
+        for t in [n * 0.01 for n in range(101)]:
+            a = 1-t
+            linepoints.append((
+                p1.x * (a**3) + # a³x₁
+                3 * (a**2) * t * c.x + # 3a²bc₁
+                3 * a * (t**2) * c2.x + # 3ab²c₂
+                (t**3) * p2.x, # b³x₂
+                
+                (a**3) * p1.y + 
+                3 * (a**2) * t * c.y + 
+                3 * a * (t**2) * c2.y + 
+                (t**3) * p2.y
+            ))
+        pygame.draw.aalines(screen, (255,255,255), False, linepoints)
 
     # draw heading lines
     for p in points:
         rad = math.radians(p.theta)
-        hx = p.x + math.cos(rad) * 25
-        hy = p.y + math.sin(rad) * 25
+        hx = p.x + math.sin(rad) * 25
+        hy = p.y + math.cos(rad) * 25
         pygame.draw.line(screen, HEADING, p.pos(), (hx, hy), 2)
 
     # draw p dots
     for p in points:
         pygame.draw.circle(screen, DOT, p.pos(), RADIUS)
 
-    # draw lines b/w dots and mousepos
+    # draw lines b/w dots and mousepos when shift held
+    if len(points) > 1: pygame.draw.aalines(screen, LINE, False, [p.pos() for p in points])
     if len(points) > 0 and keys[pygame.K_LSHIFT]:
         pygame.draw.aalines(screen, LINE, False, [p.pos() for p in points] + [mousepos])
 
