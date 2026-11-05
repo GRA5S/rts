@@ -13,7 +13,7 @@ import math
 
 pygame.init()
 screen = pygame.display.set_mode((720, 720), pygame.RESIZABLE)
-pygame.display.set_caption("Point Line UI")
+pygame.display.set_caption("rts")
 clock = pygame.time.Clock()
 running = True
 
@@ -35,10 +35,50 @@ class Point:
     theta: float
 class Line:
     def __init__(self, first_point, last_point):
-        self.first_point = first_point    
-        self.last_point = last_point
-        self.carrot = Point(first_point.x + 50, first_point.y)
-        self.carrot2 = Point(last_point.x + 50, last_point.y)
+        self.p1 = first_point    
+        self.p2 = last_point
+        
+
+class Bezier(Line):
+    def __init__(self, first_point, last_point):
+        super().__init__(first_point, last_point)
+        self.c = Point(first_point.x + 50, first_point.y)
+        self.c2 = Point(last_point.x + 50, last_point.y)
+    
+    def calculate(self, t):
+        a = 1-t
+        return (
+            self.p1.x * (a**3) +
+            3 * (a**2) * t * self.c.x +
+            3 * a * (t**2) * self.c2.x +
+            (t**3) * self.p2.x,
+            
+            (a**3) * self.p1.y + 
+            3 * (a**2) * t * self.c.y + 
+            3 * a * (t**2) * self.c2.y + 
+            (t**3) * self.p2.y
+        )
+    def derivative(self, t, h=1e-3):
+        x, y = self.calculate(t)
+        x1, y1 = self.calculate(min(t+h,1))
+        return(
+            (x1 - x) / h,
+            (y1 - y) / h
+        )
+    def double_derivative(self, t, h=1e-3):
+        dx, dy = self.derivative(max(t-h,0), h)
+        dx1, dy1 = self.derivative(min(t+h,1), h)
+        return(
+            (dx1 - dx) / (2*h),
+            (dy1 - dy) / (2*h)
+        )
+        
+    def curvature(self, t):
+        (dx, dy), (ddx, ddy) = self.derivative(t), self.double_derivative(t)
+        return (abs(dx*ddy - dy*ddx) / (dx**2 + dy**2)**1.5) # i lowk dont get the numerator of this formula.. like i get the top part but the bottom is because of smth with vectors that i dont get
+
+
+
     
 BG = (30, 30, 34)
 LINE = (120, 180, 255)
@@ -82,18 +122,18 @@ while running:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if keys[pygame.K_LSHIFT]:
                 points.append(Point(event.pos[0], event.pos[1], 0.0))
-                print(len(points))
+                # print(len(points))
                 if len(points) > 1:
-                    lines.append(Line(points[len(points)-2], points[len(points)-1]))
+                    lines.append(Bezier(points[len(points)-2], points[len(points)-1]))
             else:
                 for p in points:
                     if math.dist(mousepos, p.pos()) <= INTERACTION_RADIUS:
                         held_point = p
                 for line in lines:
-                    if math.dist(mousepos, line.carrot.pos()) <= INTERACTION_RADIUS:
-                        held_point = line.carrot
-                    elif math.dist(mousepos, line.carrot2.pos()) <= INTERACTION_RADIUS:
-                        held_point = line.carrot2
+                    if math.dist(mousepos, line.c.pos()) <= INTERACTION_RADIUS:
+                        held_point = line.c
+                    elif math.dist(mousepos, line.c2.pos()) <= INTERACTION_RADIUS:
+                        held_point = line.c2
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
             if held_point: 
                 held_point = None
@@ -112,10 +152,10 @@ while running:
     
     
     for line in lines:
-        p1 = line.first_point
-        p2 = line.last_point
-        c = line.carrot
-        c2 = line.carrot2
+        p1 = line.p1
+        p2 = line.p2
+        c = line.c
+        c2 = line.c2
         # dist = math.dist(p1.pos(), p2.pos())
         # LEAD = 0.5
         # line.carrot = Point(
@@ -132,20 +172,14 @@ while running:
         # c2 = line.carrot2
         pygame.draw.circle(screen, DOT, c.pos(), RADIUS)
         pygame.draw.circle(screen, DOT, c2.pos(), RADIUS)
-        linepoints = []
-        for t in [n * 0.01 for n in range(101)]:
-            a = 1-t
-            linepoints.append((
-                p1.x * (a**3) + # a³x₁
-                3 * (a**2) * t * c.x + # 3a²bc₁
-                3 * a * (t**2) * c2.x + # 3ab²c₂
-                (t**3) * p2.x, # b³x₂
-                
-                (a**3) * p1.y + 
-                3 * (a**2) * t * c.y + 
-                3 * a * (t**2) * c2.y + 
-                (t**3) * p2.y
-            ))
+        linepoints = [(p1.x, p1.y)]
+        granularity = 0.01
+        for t in [n * granularity for n in range(int(1/granularity))]:
+            linepoints.append(line.calculate(t))
+            curvature = line.curvature(t) * 10000
+            # print(f'point {len(linepoints)} has curvature {curvature}')
+            pygame.draw.circle(screen, (min(curvature, 255), (100 - min(curvature, 100)), 0), line.calculate(t), RADIUS)
+        linepoints.append((p2.x, p2.y))
         pygame.draw.aalines(screen, (255,255,255), False, linepoints)
 
     # draw heading lines
