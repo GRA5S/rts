@@ -9,6 +9,7 @@ TODO:
 
 
 import pygame
+import json
 import math
 
 pygame.init()
@@ -40,10 +41,12 @@ class Line:
         
 
 class Bezier(Line):
-    def __init__(self, first_point, last_point):
+    def __init__(self, first_point, last_point, c=None, c2=None):
         super().__init__(first_point, last_point)
-        self.c = Point(first_point.x + 50, first_point.y)
-        self.c2 = Point(last_point.x + 50, last_point.y)
+        if c: self.c = c 
+        else: self.c = Point(first_point.x + 50, first_point.y)
+        if c2: self.c2 = c2
+        else: self.c2 = Point(last_point.x + 50, last_point.y)
     
     def calculate(self, t):
         a = 1-t
@@ -115,9 +118,40 @@ while running:
             running = False
             
         keys = pygame.key.get_pressed()
+        if keys[pygame.K_s]:
+            with open("path.json", "w") as file:
+                
+                # for line in lines:
+                #     p1 = '{' + f'"x": "{line.p1.x}", "y": "{line.p1.y}"' + '}'
+                #     p2 = '{' + f'"x": "{line.p2.x}", "y": "{line.p2.y}"' + '}'
+                #     c1 = '{' + f'"x": "{line.c.x}", "y": "{line.c.y}"' + '}'
+                #     c2 = '{' + f'"x": "{line.c2.x}", "y": "{line.c2.y}"' + '}'
+                #     output += "{" + f'"p1":{p1}, "p2":{p2}, "c":{c1}, "c2":{c2}' + "}"
+                #     if len(lines)-1 != lines.index(line): output += ","
+                output = []
+                for line in lines: output.append({"p1": (line.p1.x, line.p1.y), "p2": (line.p2.x, line.p2.y), "c": (line.c.x, line.c.y), "c2": (line.c2.x, line.c2.y)})
+                file.write(json.dumps(output))
+        if keys[pygame.K_o]:
+            with open("path.json", "r") as file:
+                lines.clear()
+                points.clear()
+                for line in json.loads(file.read()):
+                    lines.append(
+                        Bezier(
+                            Point(line["p1"][0], line["p1"][1]),
+                            Point(line["p2"][0], line["p2"][1]),
+                            Point(line["c"][0], line["c"][1]),
+                            Point(line["c2"][0], line["c2"][1]),
+                        )
+                    )
+                    points.append(Point(line["p1"][0], line["p1"][1], 0))
+                    points.append(Point(line["p2"][0], line["p2"][1], 0))
+                    
+
         if keys[pygame.K_BACKSLASH] and points:
             points.pop()
         elif keys[pygame.K_c]:
+            lines.clear()
             points.clear()
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if keys[pygame.K_LSHIFT]:
